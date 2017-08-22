@@ -222,7 +222,7 @@ static void complete_python(PyObject *module, GeanyEditor *editor, int ch, const
                         
                         if (i > 0) 
                                 g_string_append_c(words, '\n');
-                        if (i == 15)
+                        if (i == 12)
 			{
 				g_string_append(words, "...");
 				break;
