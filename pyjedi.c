@@ -39,6 +39,7 @@
 #include "Python.h"
 // gchar *default_paths = "/usr/lib/python2.7/site-packages:/usr/lib/python2.7/dist-packages:/usr/lib/python2.7:/usr/local/lib/python2.7:/usr/local/lib/python2.7/site-packages:/usr/local/lib/python2.7/dist-packages:/usr/lib/python2.7/site-packages:/usr/lib/python2.7/dist-packages:/usr/local/lib/geany:/usr/local/lib/geany/geanypy:/home/sagar/.config/geany/plugins";
 gchar *default_include = NULL;
+static gchar *CONFIG_FILE = NULL;
 
 static void jedi_init_python(void)
 {
@@ -82,7 +83,8 @@ static void show_autocomplete(ScintillaObject *sci, gsize rootlen, GString *word
 
 static void complete_python(PyObject *module, GeanyEditor *editor, int ch, const gchar *text){
         Py_ssize_t list_size;
-        gint lexer, style, line, col, pos, rootlen, import_check = 0;
+        gint line, col, pos, rootlen;
+        gboolean import_check = FALSE;
 	ScintillaObject *sci;
         const gchar *pname;
         gchar *word_at_pos, *buffer;
@@ -113,38 +115,35 @@ static void complete_python(PyObject *module, GeanyEditor *editor, int ch, const
         pos = sci_get_current_position(sci);
         line = sci_get_current_line(sci)+1;
         word_at_pos = g_strchug(sci_get_line(sci, line-1));
-        if(g_str_has_prefix(word_at_pos, "import")){
-                import_check = 7;
-        }
-        if(import_check == 0 &&  g_str_has_prefix(word_at_pos, "from")){
-                import_check = 5;
-        }                
-        g_free(word_at_pos);
-        if (import_check == 0){
-                buffer = sci_get_contents_range(sci, 0, pos);
-        }
-        else{
+        if(g_str_has_prefix(word_at_pos, "import") || g_str_has_prefix(word_at_pos, "from")){
                 buffer = sci_get_line(sci, line-1);
                 line = 1;
-        }
+                import_check = TRUE;
+        } 
+        else{
+             buffer = sci_get_contents_range(sci, 0, pos);
+                
+        }              
+        g_free(word_at_pos);
         word_at_pos = editor_get_word_at_pos(editor, pos, GEANY_WORDCHARS".");
         if(word_at_pos == NULL){
                 return;
         }
         col = sci_get_col_from_position(sci, pos);
         rootlen = strlen(word_at_pos);
-        // if (strstr(word_at_pos, ".") != NULL){
-            // GString *pos_word = g_string_sized_new(rootlen);
-        // for(int i=rootlen; i >= 0; i--){
-           // if (word_at_pos[i]="."){
-               
-           // }
-           
-        // }
-        
-        // }
-        g_free(word_at_pos);
-        if((import_check == 0 && rootlen < 2) || rootlen == 0 ){
+        if (strstr(word_at_pos, ".") != NULL){
+                g_free(word_at_pos);
+                word_at_pos = editor_get_word_at_pos(editor, pos, NULL);
+                if(word_at_pos == NULL){
+                        rootlen = 0;
+                }
+                else{
+                        rootlen = strlen(word_at_pos);
+                        g_free(word_at_pos);
+                }
+        }
+        else if((!import_check && rootlen < 2) || rootlen == 0 ){
+                g_free(word_at_pos);
                 return;
         }
         PyRun_SimpleString("import jedi");
@@ -193,7 +192,7 @@ static void complete_python(PyObject *module, GeanyEditor *editor, int ch, const
 	}
         list_size = PyList_GET_SIZE(completion);
         if(list_size > 0){
-                GString *words = g_string_sized_new(150);
+                GString *words = g_string_sized_new(100);
         for(int i=0; i<list_size; i++){
                 complete = PyList_GET_ITEM(completion, i);
                 if (complete == NULL)
@@ -236,7 +235,7 @@ static void complete_python(PyObject *module, GeanyEditor *editor, int ch, const
                 }
                 
                 if(text == NULL){
-                        msgwin_clear_tab(MSG_MESSAGE);
+                        //msgwin_clear_tab(MSG_MESSAGE);
                         show_autocomplete(sci, rootlen, words);
                 }
                 else{
@@ -351,12 +350,22 @@ static PluginCallback demo_callbacks[] =
 static gboolean demo_init(GeanyPlugin *plugin, gpointer data)
 {
 	GeanyData *geany_data = plugin->geany_data;
+        CONFIG_FILE = g_strconcat(geany_data->app->configdir, G_DIR_SEPARATOR_S, "plugins",
+                        G_DIR_SEPARATOR_S, "pyjedi.conf", NULL);
         geany_plugin_set_data(plugin, plugin, NULL);
+        GKeyFile *config 	= g_key_file_new();
+
+	g_key_file_load_from_file(config, CONFIG_FILE, G_KEY_FILE_NONE, NULL);
+
+	default_include = utils_get_setting_string(config, "pyjedi", "path", NULL);
+        if (default_include != NULL){
+                append_path(default_include);
+        }
+        g_key_file_free(config);
 	return TRUE;
 }
 
 
-/* Callback connected in demo_configure(). */
 static void
 on_configure_response(GtkDialog *dialog, gint response, gpointer user_data)
 {
@@ -365,23 +374,46 @@ on_configure_response(GtkDialog *dialog, gint response, gpointer user_data)
 	{
 		/* We only have one pref here, but for more you would use a struct for user_data */
 		GtkWidget *entry = GTK_WIDGET(user_data);
-                if (default_include != NULL && utils_str_equal(gtk_entry_get_text(GTK_ENTRY(entry)), default_include)){
+                const gchar *input_path = gtk_entry_get_text(GTK_ENTRY(entry));
+                if (default_include != NULL && utils_str_equal(input_path, default_include)){
                         return;
                 }
                 g_free(default_include);
-                default_include = g_strdup(gtk_entry_get_text(GTK_ENTRY(entry)));
+                default_include = g_strdup(input_path);
+                if(input_path != NULL){
+                        g_free(input_path);
+                }
                 if (default_include == NULL){
                         return;
                 }
-                // if (!g_file_test(default_include, G_FILE_TEST_IS_DIR))
-                        // return;
+                if (!g_file_test(default_include, G_FILE_TEST_IS_DIR))
+                        return;
                 append_path(default_include);
                 /* maybe the plugin should write here the settings into a file
 		 * (e.g. using GLib's GKeyFile API)
 		 * all plugin specific files should be created in:
                 geany->app->configdir G_DIR_SEPARATOR_S plugins G_DIR_SEPARATOR_S pluginname G_DIR_SEPARATOR_S
 		 * e.g. this could be: ~/.config/geany/plugins/Demo/, please use geany->app->configdir */
-	}
+                 GKeyFile 	*config 		= g_key_file_new();
+                gchar 		*config_dir 	= g_path_get_dirname(CONFIG_FILE);
+                gchar 		*data;
+
+                g_key_file_load_from_file(config, CONFIG_FILE, G_KEY_FILE_NONE, NULL);
+                if (! g_file_test(config_dir, G_FILE_TEST_IS_DIR) && utils_mkdir(config_dir, TRUE) != 0)
+                {
+                        g_free(config_dir);
+                        g_key_file_free(config);
+                        return FALSE;
+                }
+
+                g_key_file_set_string(config, 	"pyjedi", "path", default_include);
+                data = g_key_file_to_data(config, NULL, NULL);
+                utils_write_file(CONFIG_FILE, data);
+                g_free(data);
+
+                g_free(config_dir);
+                g_key_file_free(config);
+        }
 }
 
 /* Called by Geany to show the plugin's configure dialog. This function is always called after
@@ -391,6 +423,7 @@ on_configure_response(GtkDialog *dialog, gint response, gpointer user_data)
  *       dialog. */
 static GtkWidget *demo_configure(GeanyPlugin *plugin, GtkDialog *dialog, gpointer data)
 {
+        
 	GtkWidget *label, *entry, *vbox;
 
 	/* example configuration dialog */
@@ -423,6 +456,7 @@ static void demo_cleanup(GeanyPlugin *plugin, gpointer data)
 	// gtk_widget_destroy(main_menu_item);
 	// /* release other allocated strings and objects */
 	g_free(default_include);
+        g_free(CONFIG_FILE);
         //Py_Finalize();
 }
 
