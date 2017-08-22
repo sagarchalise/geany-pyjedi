@@ -142,6 +142,7 @@ static void complete_python(PyObject *module, GeanyEditor *editor, int ch, const
         }
         col = sci_get_col_from_position(sci, pos);
         rootlen = strlen(word_at_pos);
+        g_free(word_at_pos);
         if((ch != '.') && ((import_check == 0 && rootlen < 2) || rootlen == 0) ){
                 return;
         }
@@ -189,7 +190,6 @@ static void complete_python(PyObject *module, GeanyEditor *editor, int ch, const
 		Py_XDECREF(completion);
 		return;
 	}
-        // editor_prefs = editor_get_prefs(editor);
         list_size = PyList_GET_SIZE(completion);
         if(list_size > 0){
                 GString *words = g_string_sized_new(150);
