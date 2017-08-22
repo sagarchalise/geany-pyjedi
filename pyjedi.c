@@ -104,21 +104,13 @@ static void complete_python(PyObject *module, GeanyEditor *editor, int ch, const
 		case '}':
 		case ':':
                         return;
-                        // scintilla_send_message(sci, SCI_AUTOCSTOPS, 0, (sptr_t)"(){}[]:");
-                        // break;
         }
         
         }
-        // else{
-                // msgwin_status_add("%s", text);
-                // return;
-        // }
-        
 	/* If we are at the beginning of the document, we skip autocompletion as we can't determine the
 	 * necessary styling information */
 	sci = editor->sci;
         pos = sci_get_current_position(sci);
-        // char_at_pos = sci_get_char_at(sci, pos);
         line = sci_get_current_line(sci)+1;
         word_at_pos = g_strchug(sci_get_line(sci, line-1));
         if(g_str_has_prefix(word_at_pos, "import")){
@@ -135,15 +127,24 @@ static void complete_python(PyObject *module, GeanyEditor *editor, int ch, const
                 buffer = sci_get_line(sci, line-1);
                 line = 1;
         }
-        word_at_pos = editor_get_word_at_pos(editor, pos, (ch=='.')?GEANY_WORDCHARS".":NULL);
-        
+        word_at_pos = editor_get_word_at_pos(editor, pos, GEANY_WORDCHARS".");
         if(word_at_pos == NULL){
                 return;
         }
         col = sci_get_col_from_position(sci, pos);
         rootlen = strlen(word_at_pos);
+        // if (strstr(word_at_pos, ".") != NULL){
+            // GString *pos_word = g_string_sized_new(rootlen);
+        // for(int i=rootlen; i >= 0; i--){
+           // if (word_at_pos[i]="."){
+               
+           // }
+           
+        // }
+        
+        // }
         g_free(word_at_pos);
-        if((ch != '.') && ((import_check == 0 && rootlen < 2) || rootlen == 0) ){
+        if((import_check == 0 && rootlen < 2) || rootlen == 0 ){
                 return;
         }
         PyRun_SimpleString("import jedi");
@@ -202,7 +203,6 @@ static void complete_python(PyObject *module, GeanyEditor *editor, int ch, const
                         Py_XDECREF(complete);
                         continue;
                 }
-                // Py_XINCREF(complete);
                 name = PyObject_GetAttrString(complete, "name_with_symbols");
                 if (name == NULL)
                 {
@@ -212,7 +212,6 @@ static void complete_python(PyObject *module, GeanyEditor *editor, int ch, const
                         Py_XDECREF(name);
                         continue;
                 }
-                // Py_XINCREF(name);
                 pname = (const gchar *)PyString_AsString(name);
                 if(text != NULL){
                         if(!utils_str_equal(pname, text))
@@ -224,7 +223,7 @@ static void complete_python(PyObject *module, GeanyEditor *editor, int ch, const
                         
                         if (i > 0) 
                                 g_string_append_c(words, '\n');
-                        if (i == 20)
+                        if (i == 15)
 			{
 				g_string_append(words, "...");
 				break;
@@ -234,6 +233,7 @@ static void complete_python(PyObject *module, GeanyEditor *editor, int ch, const
                         continue;
                 }
                 g_string_append(words, pname);
+                }
                 
                 if(text == NULL){
                         msgwin_clear_tab(MSG_MESSAGE);
@@ -245,7 +245,6 @@ static void complete_python(PyObject *module, GeanyEditor *editor, int ch, const
                 }
                 
                 g_string_free(words, TRUE);
-        }
         } 
         g_free(buffer);
         
