@@ -244,12 +244,11 @@ static void complete_python(PyObject *module, GeanyEditor *editor, int ch, const
                 g_string_append(words, pname);
                 }
                 
+                msgwin_clear_tab(MSG_MESSAGE);
                 if(text == NULL){
-                        msgwin_clear_tab(MSG_MESSAGE);
                         show_autocomplete(sci, rootlen, words);
                 }
                 else{
-                        msgwin_clear_tab(MSG_MESSAGE);
                         if(words->len > 6){
                                 msgwin_msg_add(COLOR_BLACK, line-1, editor->document, "%s", words->str);
                                 msgwin_switch_tab(MSG_MESSAGE, FALSE);
