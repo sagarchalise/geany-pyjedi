@@ -88,7 +88,7 @@ static void complete_python(PyObject *module, GeanyEditor *editor, int ch, const
 	ScintillaObject *sci;
         const gchar *pname;
         gchar *word_at_pos, *buffer;
-        PyObject *script, *completion, *complete, *name, *cls, *args;
+        PyObject *script, *completion, *complete, *name, *cls, *args, *docstring;
 	g_return_if_fail(editor !=NULL);
         if (text == NULL){
                 
@@ -202,7 +202,7 @@ static void complete_python(PyObject *module, GeanyEditor *editor, int ch, const
                         Py_XDECREF(complete);
                         continue;
                 }
-                name = PyObject_GetAttrString(complete, "name_with_symbols");
+                name = PyObject_GetAttrString(complete, "name");
                 if (name == NULL)
                 {
                         if (PyErr_Occurred())
@@ -215,32 +215,45 @@ static void complete_python(PyObject *module, GeanyEditor *editor, int ch, const
                 if(text != NULL){
                         if(!utils_str_equal(pname, text))
                                 continue;
-                        g_string_append(words, (const gchar *)PyString_AsString(PyObject_CallMethod(complete, "docstring", NULL)));
-                        break;
+                        docstring = PyObject_CallMethod(complete, "docstring", NULL);
+                        if(docstring == NULL){
+                                break;
+                        }
+                        else{
+                                pname = (const gchar *)PyString_AsString(docstring);
+                                if (strlen(pname) > 0){
+                                        g_string_append(words, "Doc:\n");
+                                        g_string_append(words, pname);
+                                }
+                                Py_XDECREF(docstring);
+                                break;
+                        }
                 }
                 else{
-                        
+                        if(g_str_has_prefix(pname, "__") && g_str_has_suffix(pname, "__")){
+                                continue;
+                        }
                         if (i > 0) 
                                 g_string_append_c(words, '\n');
-                        if (i == 12)
+                        if (i == 15)
 			{
 				g_string_append(words, "...");
 				break;
 			}
                 }
-                if(g_str_has_prefix(pname, "__") && g_str_has_suffix(pname, "__")){
-                        continue;
-                }
                 g_string_append(words, pname);
                 }
                 
                 if(text == NULL){
-                        //msgwin_clear_tab(MSG_MESSAGE);
+                        msgwin_clear_tab(MSG_MESSAGE);
                         show_autocomplete(sci, rootlen, words);
                 }
                 else{
-                        msgwin_msg_add(COLOR_BLACK, line, editor->document, "%s", words->str);
-                        msgwin_switch_tab(MSG_MESSAGE, FALSE);
+                        msgwin_clear_tab(MSG_MESSAGE);
+                        if(words->len > 6){
+                                msgwin_msg_add(COLOR_BLACK, line-1, editor->document, "%s", words->str);
+                                msgwin_switch_tab(MSG_MESSAGE, FALSE);
+                        }
                 }
                 
                 g_string_free(words, TRUE);
@@ -288,18 +301,11 @@ static gboolean on_editor_notify(GObject *object, GeanyEditor *editor,
 	switch (nt->nmhdr.code)
 	{
 		case SCN_CHARADDED:
-                        // if(default_auto_complete){
-                                // sci_send_command(editor->sci, SCI_AUTOCCANCEL);
-                                // default_auto_complete = FALSE;
-                        // }
-                        // if(default_auto_complete && scintilla_send_message(editor->sci, SCI_AUTOCACTIVE, 0, 0)){
-                                // default_auto_complete = FALSE;
-                        // }
                         complete_python(module, editor, nt->ch, NULL);
                         break;
-                // case SCN_AUTOCSELECTION:
-                        // complete_python(module, editor, nt->ch, nt->text);
-                        // break;
+                case SCN_AUTOCSELECTION:
+                        complete_python(module, editor, nt->ch, nt->text);
+                        break;
 	}
 
 	return FALSE;
