@@ -11,7 +11,7 @@ startinstall:
 	chmod 755 ~/.config/geany/plugins/pyjedi.so
 
 uninstall:
-	rm -f ~/.config/geany/plugins/pyjedi*
+	rm -f ~/.config/geany/plugins/pyjedi.so
 
 clean:
 	rm -f ./pyjedi.so
