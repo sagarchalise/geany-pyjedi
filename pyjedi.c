@@ -157,7 +157,7 @@ static void complete_python(PyObject *module, GeanyEditor *editor, int ch, const
 		Py_XDECREF(module);
 		return;
 	}
-        args = Py_BuildValue("(s,i,i)", buffer, line, col);
+        args = Py_BuildValue("(u,i,i)", buffer, line, col);
         script = PyObject_CallObject(cls, args);
         
 	if (script == NULL)
@@ -190,10 +190,26 @@ static void complete_python(PyObject *module, GeanyEditor *editor, int ch, const
 		Py_XDECREF(completion);
 		return;
 	}
+    if (PyErr_Occurred()){
+        Py_XDECREF(completion);
+        Py_XDECREF(module);
+        Py_XDECREF(cls);
+        Py_XDECREF(script);
+		Py_XDECREF(args);
+        return;
+}
         list_size = PyList_GET_SIZE(completion);
         if(list_size > 0){
                 GString *words = g_string_sized_new(100);
         for(int i=0; i<list_size; i++){
+                if (PyErr_Occurred()){
+                    Py_XDECREF(completion);
+                    Py_XDECREF(module);
+                    Py_XDECREF(cls);
+                    Py_XDECREF(script);
+                    Py_XDECREF(args);
+                    return;
+                }
                 complete = PyList_GET_ITEM(completion, i);
                 if (complete == NULL)
                 {
