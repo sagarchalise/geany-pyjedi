@@ -157,7 +157,7 @@ static void complete_python(PyObject *module, GeanyEditor *editor, int ch, const
 		Py_XDECREF(module);
 		return;
 	}
-        args = Py_BuildValue("(u,i,i)", buffer, line, col);
+        args = Py_BuildValue("(s,i,i)", buffer, line, col);
         script = PyObject_CallObject(cls, args);
         
 	if (script == NULL)
@@ -227,7 +227,17 @@ static void complete_python(PyObject *module, GeanyEditor *editor, int ch, const
                         Py_XDECREF(name);
                         continue;
                 }
-                pname = (const gchar *)PyString_AsString(name);
+                if(PyUnicode_Check(name)){
+                        PyObject * temp_bytes = PyUnicode_AsEncodedString(name, "UTF-8", "strict"); // Owned reference
+                        if (temp_bytes != NULL) {
+                                pname = PyBytes_AS_STRING(temp_bytes); // Borrowed pointer
+                                pname = strdup(pname);
+                                Py_DECREF(temp_bytes);
+                        }
+                }
+                else{
+                        pname = (const gchar *)PyUnicode_AsASCIIString(name);
+                }
                 if(text != NULL){
                         if(!utils_str_equal(pname, text))
                                 continue;
@@ -236,7 +246,17 @@ static void complete_python(PyObject *module, GeanyEditor *editor, int ch, const
                                 break;
                         }
                         else{
-                                pname = (const gchar *)PyString_AsString(docstring);
+                                if(PyUnicode_Check(docstring)){
+                        PyObject * temp_bytes = PyUnicode_AsEncodedString(docstring, "UTF-8", "strict"); // Owned reference
+                        if (temp_bytes != NULL) {
+                                pname = PyBytes_AS_STRING(temp_bytes); // Borrowed pointer
+                                pname = strdup(pname);
+                                Py_DECREF(temp_bytes);
+                        }
+                        }
+                else{
+                        pname = (const gchar *)PyUnicode_AsASCIIString(name);
+                }
                                 if (strlen(pname) > 0){
                                         g_string_append(words, "Doc:\n");
                                         g_string_append(words, pname);

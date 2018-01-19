@@ -1,8 +1,8 @@
 all: build
 	
 build:	
-	gcc -DLOCALEDIR=\"\" -DGETTEXT_PACKAGE=\"pyjedi\" -c ./pyjedi.c -fPIC `pkg-config --cflags geany python-2.7`
-	gcc pyjedi.o -o pyjedi.so -shared `pkg-config --libs geany python-2.7`
+	gcc -DLOCALEDIR=\"\" -DGETTEXT_PACKAGE=\"pyjedi\" -c ./pyjedi.c -fPIC `pkg-config --cflags geany python3`
+	gcc pyjedi.o -o pyjedi.so -shared `pkg-config --libs geany python3`
 
 install: uninstall startinstall
 
