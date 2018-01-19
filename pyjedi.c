@@ -62,13 +62,15 @@ static void append_path(gchar *add_path){
                 // g_free(rep);
                 sys_path_set = PySet_New(sys_path);
                 // rep = (gchar *)PyObject_Str(sys_path);
-                if(PySet_Contains(sys_path_set, Py_BuildValue("s", add_path)) == 0){
+                PyObject *a_path = Py_BuildValue("s", add_path);
+                if(PySet_Contains(sys_path_set, a_path) == 0){
                         msgwin_status_add("Jedi Path Added: %s", add_path);
                         Py_XINCREF(sys_path);
-                        PyList_Append(sys_path, Py_BuildValue("s", add_path));        
+                        PyList_Append(sys_path, a_path);        
                     
                 }
                 Py_XDECREF(sys_path_set);
+                Py_XDECREF(a_path);
                 
         }
         Py_XDECREF(sys_path);
