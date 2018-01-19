@@ -55,17 +55,21 @@ static void jedi_init_python(void)
 static void append_path(gchar *add_path){
         // if (project != NULL || DOC_VALID(doc));
         jedi_init_python();
-        PyObject *sys_path;
-        gchar *rep = NULL;
+        PyObject *sys_path, *sys_path_set;
+        // gchar *rep = NULL;
         sys_path = PySys_GetObject("path");
         if (PyList_Check(sys_path)){
-                g_free(rep);
-                rep = (gchar *)PyObject_Str(sys_path);
-                if(g_strrstr(rep, add_path) == NULL){
+                // g_free(rep);
+                sys_path_set = PySet_New(sys_path);
+                // rep = (gchar *)PyObject_Str(sys_path);
+                if(PySet_Contains(sys_path_set, Py_BuildValue("s", add_path)) == 0){
                         msgwin_status_add("Jedi Path Added: %s", add_path);
                         Py_XINCREF(sys_path);
                         PyList_Append(sys_path, Py_BuildValue("s", add_path));        
+                    
                 }
+                Py_XDECREF(sys_path_set);
+                
         }
         Py_XDECREF(sys_path);
 }
@@ -157,7 +161,7 @@ static void complete_python(PyObject *module, GeanyEditor *editor, int ch, const
 		Py_XDECREF(module);
 		return;
 	}
-        args = Py_BuildValue("(u,i,i)", buffer, line, col);
+        args = Py_BuildValue("(s,i,i)", buffer, line, col);
         script = PyObject_CallObject(cls, args);
         
 	if (script == NULL)
