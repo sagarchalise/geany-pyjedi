@@ -83,7 +83,7 @@ class JediPlugin(Peasy.Plugin, Peasy.PluginConfigure):
         word_at_pos = sci.get_line(line-1)
         if word_at_pos.startswith(('from', 'import')):
             line = 1
-            buffer = word_at_pos
+            buffer = sci.get_line(line-1)
             import_check = True
         else:
             buffer = sci.get_contents_range(0, pos)
@@ -110,12 +110,13 @@ class JediPlugin(Peasy.Plugin, Peasy.PluginConfigure):
         if not completions:
             return
         word = ""
+        c_count = len(completions)-1
         for i, complete in enumerate(completions):
             name = complete.name
             if name.startswith('__'):
                 continue
             word += name
-            if i > 0:
+            if i > 0 and i != c_count:
                 word += "\n"
             if i == 20:
                 word += "..."
@@ -123,7 +124,7 @@ class JediPlugin(Peasy.Plugin, Peasy.PluginConfigure):
         if word:
             word = ctypes.c_char_p(word.encode('utf8'))
             tt = ctypes.cast(word, ctypes.c_void_p).value
-            sci.send_command(GeanyScintilla.SCI_AUTOCCANCEL)
+            sci.send_message(GeanyScintilla.SCI_AUTOCCANCEL, 0, 0)
             sci.send_message(GeanyScintilla.SCI_AUTOCSHOW, rootlen, tt)
 
     def on_configure_response(self, dlg, response_id, user_data):
@@ -142,14 +143,17 @@ class JediPlugin(Peasy.Plugin, Peasy.PluginConfigure):
 
     def do_configure(self, dialog):
         #  frame = Gtk.Frame()
-        vbox = Gtk.VBox(spacing=1)
-        vbox.set_border_width(1)
+        align = Gtk.Alignment.new(0, 0, 1, 0)
+        align.props.left_padding = 12
+        vbox = Gtk.VBox(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        vbox.set_border_width(2)
         label = Gtk.Label(_("Extra Path to Include with jedi:"))
-        #  label.set_alignment(0, 0.5)
+        label.set_alignment(0, 0.5)
         entry = Gtk.Entry()
         if self.default_include:
             entry.set_text(self.default_include)
         vbox.add(label)
         vbox.add(entry)
+        align.add(vbox)
         dialog.connect("response", self.on_configure_response, entry)
-        return vbox
+        return align
