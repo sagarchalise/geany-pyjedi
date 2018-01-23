@@ -1,6 +1,6 @@
 # geany-pyjedi
 
-Python completion with jedi.
+Python completion with `jedi` based on [Peasy](https://github.com/kugel-/peasy).
 
 
 *Adds project path on project open
@@ -8,13 +8,5 @@ Python completion with jedi.
 *Also a functionality to configure a path on session.
 
 
-Requires `jedi` && Python C headers.
+Requires `jedi`  installed in python3
 `pip install jedi`
-
-
-$ gcc -DLOCALEDIR=\"\" -DGETTEXT_PACKAGE=\"geany-pyjedi\" -c pyjedi.c -fPIC `pkg-config --cflags geany python-2.7`
-
-$ gcc pyjedi.o -o pyjedi.so -shared `pkg-config --libs geany python-2.7`
-
-
-**Copy pyjedi.so to plugin path**

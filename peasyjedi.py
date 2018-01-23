@@ -1,37 +1,57 @@
-import ctypes
 import os
-from configparser import SafeConfigParser
-from gettext import gettext as _
-from gi.repository import Gtk, GObject
+import sys
+import ctypes
+from gi.repository import Gtk
+from gi.repository import GLib
 from gi.repository import Geany
 from gi.repository import GeanyScintilla
 from gi.repository import Peasy
 
+_ = Peasy.gettext
+
 GEANY_WORDCHARS = "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
-class JediPlugin(Peasy.Plugin):
+class JediPlugin(Peasy.Plugin, Peasy.PluginConfigure):
     __gtype_name__ = "PeasyJedi"
     
+    def __init__(self):
+        self.sys_path = sys.path
+        self.phandler = None
+        self.handler = None
+        self.jedi_config = None
+        self.default_include = None
+
     def do_enable(self):
+        self.jedi_config = os.path.join(self.geany_plugin.geany_data.app.configdir, "plugins/pyjedi.conf")
         o = self.geany_plugin.geany_data.object
-        #  o.connect("project-open", self.on_project_open)
-        o.connect("editor-notify", self.on_editor_notify)
-    
-
+        self.phandler = o.connect("project-open", self.on_project_open)
+        self.handler = o.connect("editor-notify", self.on_editor_notify)
+        #  o.connect("project-close", self.on_project_close)
+        # load startup config
+        self.keyfile = GLib.KeyFile.new()        
+        if (os.path.isfile(self.jedi_config)):
+            self.keyfile.load_from_file(self.jedi_config, GLib.KeyFileFlags.KEEP_COMMENTS)
+            self.default_include = self.keyfile.get_string("pyjedi", "path")
+            self.append_sys_path(self.default_include)
+        return True
+        
     def do_disable(self):
-        pass
+        o = self.geany_plugin.geany_data.object
+        o.disconnect(self.phandler)
+        o.disconnect(self.handler)
 
-    def load_config(self):
-        self.cfg_path = os.path.join(self.geany_plugin.geany_data.app.configdir, "plugins", "pyemmet.conf")
-        self.cfg = SafeConfigParser()
-        self.cfg.read(self.cfg_path)
+    def append_sys_path(self, path):
+        if path and path not in self.sys_path:
+            self.sys_path.append(path)
 
-    def save_config(self):
-        GObject.idle_add(self.on_save_config_timeout)
-
-    def on_save_config_timeout(self, data=None):
-        self.cfg.write(open(self.cfg_path, 'w'))
-        return False
+    #  def on_project_close(self, g_obj):
+        #  print(dir(g_obj))
+        #  print(self.geany_plugin.geany_data.app.project)
+        
+    def on_project_open(self, g_obj, cnf_file):
+        proj = self.geany_plugin.geany_data.app.project
+        if proj:
+            self.append_sys_path(proj.base_path)
 
     def on_editor_notify(self, g_obj, editor, nt):
         cur_doc = editor.document or Geany.Document.get_current()
@@ -50,11 +70,11 @@ class JediPlugin(Peasy.Plugin):
         except ImportError:
             print('No jedi installed.')
             return False
-        if nt.nmhdr.code in (GeanyScintilla.SCN_CHARADDED, GeanyScintilla.SCN_AUTOCSELECTION):
+        if nt.nmhdr.code == GeanyScintilla.SCN_CHARADDED: 
+        #  (GeanyScintilla.SCN_CHARADDED, GeanyScintilla.SCN_AUTOCSELECTION):
             self.complete_python(editor, nt.ch, getattr(nt, 'text', None))
 
     def complete_python(self, editor, char, text=None):
-        #  self.win.hide()
         if char in ('\r', '\n', '>', '/', '(', ')', '{', '[', '"', '\'', '}', ':'):
             return
         sci = editor.sci
@@ -83,43 +103,53 @@ class JediPlugin(Peasy.Plugin):
             return
         import jedi
         jedi.settings.case_insensitive_completion = False
-        script = jedi.Script(buffer, line, col)
+        script = jedi.Script(buffer, line, col, sys_path=self.sys_path)
         if not script:
             return
         completions = script.completions()
         if not completions:
             return
         word = ""
-        #  self.store.clear()
-        for complete in completions:
+        for i, complete in enumerate(completions):
             name = complete.name
             if name.startswith('__'):
                 continue
-            #  self.store.append([name])
-            word += "{}\n".format(name)
-        sci.send_command(GeanyScintilla.SCI_AUTOCCANCEL)
-        word = ctypes.c_wchar_p(word)
-        #  word = ctypes.c_char_p(word.encode('utf8'))
-            #  word = Geany.encodings_convert_to_utf8(word, -1)
-        sci.send_message(GeanyScintilla.SCI_AUTOCSHOW, rootlen, ctypes.cast(word, ctypes.c_void_p).value)
-        #  self.win.show_all()
+            word += name
+            if i > 0:
+                word += "\n"
+            if i == 20:
+                word += "..."
+                break
+        if word:
+            word = ctypes.c_char_p(word.encode('utf8'))
+            tt = ctypes.cast(word, ctypes.c_void_p).value
+            sci.send_command(GeanyScintilla.SCI_AUTOCCANCEL)
+            sci.send_message(GeanyScintilla.SCI_AUTOCSHOW, rootlen, tt)
 
-    def configure(self, dialog):
-        vbox = Gtk.VBox(spacing=6)
-        vbox.set_border_width(6)
-        check_highlight = Gtk.CheckButton(_("Highlight Matching Tags"))
-        if self.highlight_tag:
-            check_highlight.set_active(True)
-        check_highlight.connect("toggled", self.on_highlight_tag_toggled)
-        check_editor_menu = Gtk.CheckButton(_("Show some actions on editor menu"))
-        if self.show_editor_menu:
-            check_editor_menu.set_active(True)
-        check_editor_menu.connect("toggled", self.on_editor_menu_toggled)
-        check_specific_menu = Gtk.CheckButton(_("Attach menu to menubar rather than tools menu."))
-        if self.show_specific_menu:
-            check_specific_menu.set_active(True)
-        check_specific_menu.connect("toggled", self.on_specific_menu_toggled)
-        vbox.pack_start(check_highlight, True, True, 0)
-        vbox.pack_start(check_editor_menu, True, True, 0)
-        vbox.pack_start(check_specific_menu, True, True, 0)
+    def on_configure_response(self, dlg, response_id, user_data):
+        if (response_id in (Gtk.ResponseType.APPLY, Gtk.ResponseType.OK)):
+            inc = user_data.get_text()
+            if self.default_include is not None and inc == self.default_include:
+                return
+            if (os.path.isfile(self.jedi_config)):
+                self.keyfile.load_from_file(self.jedi_config, GLib.KeyFileFlags.KEEP_COMMENTS)
+                self.keyfile.set_string("pyjedi", "path", inc or '')
+                self.keyfile.save_to_file(self.jedi_config)
+            if self.default_include in self.sys_path:
+                self.sys_path.remove(self.default_include) 
+            self.append_sys_path(inc)
+            self.default_include = inc
+
+    def do_configure(self, dialog):
+        #  frame = Gtk.Frame()
+        vbox = Gtk.VBox(spacing=1)
+        vbox.set_border_width(1)
+        label = Gtk.Label(_("Extra Path to Include with jedi:"))
+        #  label.set_alignment(0, 0.5)
+        entry = Gtk.Entry()
+        if self.default_include:
+            entry.set_text(self.default_include)
+        vbox.add(label)
+        vbox.add(entry)
+        dialog.connect("response", self.on_configure_response, entry)
         return vbox
