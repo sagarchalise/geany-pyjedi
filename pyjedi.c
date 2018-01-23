@@ -44,7 +44,7 @@ static gchar *CONFIG_FILE = NULL;
 static void jedi_init_python(void)
 {
 
-	if (!Py_IsInitialized())
+        if (!Py_IsInitialized())
 		Py_Initialize();
         // if (!is_path_set){
                 // PySys_SetPath(default_paths);
@@ -55,6 +55,10 @@ static void jedi_init_python(void)
 static void append_path(gchar *add_path){
         // if (project != NULL || DOC_VALID(doc));
         jedi_init_python();
+        // Py_Initialize();
+        // Py_SetProgramName(argv[0]);
+  // Py_Initialize();
+        // PySys_SetArgv(NULL, NULL);
         PyObject *sys_path, *sys_path_set;
         // gchar *rep = NULL;
         sys_path = PySys_GetObject("path");
@@ -139,7 +143,7 @@ static void complete_python(PyObject *module, GeanyEditor *editor, int ch, const
         rootlen = strlen(word_at_pos);
         if (strstr(word_at_pos, ".") != NULL){
                 g_free(word_at_pos);
-                word_at_pos = editor_get_word_at_pos(editor, pos, NULL);
+                word_at_pos = editor_get_word_at_pos(editor, pos, GEANY_WORDCHARS);
                 if(word_at_pos == NULL){
                         rootlen = 0;
                 }
@@ -236,8 +240,8 @@ static void complete_python(PyObject *module, GeanyEditor *editor, int ch, const
                 if(PyUnicode_Check(name)){
                         PyObject * temp_bytes = PyUnicode_AsEncodedString(name, "UTF-8", "strict"); // Owned reference
                         if (temp_bytes != NULL) {
-                                pname = PyBytes_AS_STRING(temp_bytes); // Borrowed pointer
-                                pname = strdup(pname);
+                                pname = (const gchar *)PyBytes_AS_STRING(temp_bytes); // Borrowed pointer
+                                // encodings_convert_to_utf8(pname, -1, NULL);
                                 Py_DECREF(temp_bytes);
                         }
                 }
@@ -255,8 +259,8 @@ static void complete_python(PyObject *module, GeanyEditor *editor, int ch, const
                                 if(PyUnicode_Check(docstring)){
                         PyObject * temp_bytes = PyUnicode_AsEncodedString(docstring, "UTF-8", "strict"); // Owned reference
                         if (temp_bytes != NULL) {
-                                pname = PyBytes_AS_STRING(temp_bytes); // Borrowed pointer
-                                pname = strdup(pname);
+                                pname = (const gchar *)PyBytes_AS_STRING(temp_bytes); // Borrowed pointer
+                                // encodings_convert_to_utf8(pname, -1, NULL);
                                 Py_DECREF(temp_bytes);
                         }
                         }
@@ -318,6 +322,7 @@ static gboolean on_editor_notify(GObject *object, GeanyEditor *editor,
         if(doc->file_type->id != GEANY_FILETYPES_PYTHON){
                 return FALSE;
         }
+        
 	/* For detailed documentation about the SCNotification struct, please see
 	 * http://www.scintilla.org/ScintillaDoc.html#Notifications. */
         pos = sci_get_current_position(editor->sci);
@@ -330,7 +335,10 @@ static gboolean on_editor_notify(GObject *object, GeanyEditor *editor,
 	if (!highlighting_is_code_style(lexer, style))
 		return FALSE;
         jedi_init_python();
-        
+        // Py_Initialize();
+        // PySys_SetArgv(NULL, NULL);
+        // PyRun_SimpleString("import sys");
+        // const gchar *mod_name = "jedi";
         module = PyImport_ImportModule("jedi");
         if (module == NULL)
 	{
