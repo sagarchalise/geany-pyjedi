@@ -20,6 +20,7 @@ class JediPlugin(Peasy.Plugin, Peasy.PluginConfigure):
         self.handler = None
         self.jedi_config = None
         self.default_include = None
+        self.completion_words = None
 
     def do_enable(self):
         self.jedi_config = os.path.join(self.geany_plugin.geany_data.app.configdir, "plugins/pyjedi.conf")
@@ -81,10 +82,26 @@ class JediPlugin(Peasy.Plugin, Peasy.PluginConfigure):
             self.complete_python(editor, nt.ch, getattr(nt, 'text', None))
 
     def complete_python(self, editor, char, text=None):
-        if char in ('\r', '\n', '>', '/', '(', ')', '{', '[', '"', '\'', '}', ':'):
-            return
         sci = editor.sci
         pos = sci.get_current_position()
+        char = chr(char)
+        if char in ('\r', '\n', '>', '/', '(', ')', '{', '[', '"', '\'', '}', ':'):
+            if char == '(':
+                word_at_pos = editor.get_word_at_pos(pos-1, GEANY_WORDCHARS)
+                if not word_at_pos or not self.completion_words:
+                    return
+                comp = self.completion_words.get(word_at_pos)
+                if not comp:
+                    return
+                if comp.name_with_symbols == word_at_pos:
+                    return
+                self.scintilla_command(sci,
+                    sci_cmd=GeanyScintilla.SCI_CALLTIPCANCEL,
+                    sci_msg=GeanyScintilla.SCI_CALLTIPSHOW,
+                    lparam=pos,
+                    data=comp.name_with_symbols)
+                #  self.word_completions = None
+            return
         line = sci.get_current_line()+1
         word_at_pos = sci.get_line(line-1)
         if word_at_pos.startswith(('from', 'import')):
@@ -115,15 +132,15 @@ class JediPlugin(Peasy.Plugin, Peasy.PluginConfigure):
         completions = script.completions()
         if not completions:
             return
-        self.completion_words = {}
         count = 0
+        self.completion_words = {}
         for complete in completions:
             name = complete.name
             if name.startswith('__'):
                 continue
             self.completion_words[name] = complete
             count += 1
-            if count == 20:
+            if count == 19:
                 break
         if count > 0:
             k = self.completion_words.keys()
