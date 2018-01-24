@@ -44,6 +44,12 @@ class JediPlugin(Peasy.Plugin, Peasy.PluginConfigure):
         if path and path not in self.sys_path:
             self.sys_path.append(path)
 
+    @staticmethod
+    def scintilla_command(sci, sci_msg, sci_cmd, lparam, data):
+        data = ctypes.c_char_p(data.encode('utf8'))
+        tt = ctypes.cast(data, ctypes.c_void_p).value
+        sci.send_command(sci_cmd)
+        sci.send_message(sci_msg, lparam, tt)
     #  def on_project_close(self, g_obj):
         #  print(dir(g_obj))
         #  print(self.geany_plugin.geany_data.app.project)
@@ -109,23 +115,27 @@ class JediPlugin(Peasy.Plugin, Peasy.PluginConfigure):
         completions = script.completions()
         if not completions:
             return
-        word = ""
-        c_count = len(completions)-1
-        for i, complete in enumerate(completions):
+        self.completion_words = {}
+        count = 0
+        for complete in completions:
             name = complete.name
             if name.startswith('__'):
                 continue
-            word += name
-            if i > 0 and i != c_count:
-                word += "\n"
-            if i == 20:
-                word += "..."
+            self.completion_words[name] = complete
+            count += 1
+            if count == 20:
                 break
-        if word:
-            word = ctypes.c_char_p(word.encode('utf8'))
-            tt = ctypes.cast(word, ctypes.c_void_p).value
-            sci.send_message(GeanyScintilla.SCI_AUTOCCANCEL, 0, 0)
-            sci.send_message(GeanyScintilla.SCI_AUTOCSHOW, rootlen, tt)
+        if count > 0:
+            k = self.completion_words.keys()
+            if count == 1:
+                data = "".join(k)
+            else:
+                data = "\n".join(k)
+            self.scintilla_command(sci,
+                sci_cmd=GeanyScintilla.SCI_AUTOCCANCEL,
+                sci_msg=GeanyScintilla.SCI_AUTOCSHOW,
+                lparam=rootlen,
+                data=data)
 
     def on_configure_response(self, dlg, response_id, user_data):
         if (response_id in (Gtk.ResponseType.APPLY, Gtk.ResponseType.OK)):
