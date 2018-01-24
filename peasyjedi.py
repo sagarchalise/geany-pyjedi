@@ -104,19 +104,23 @@ class JediPlugin(Peasy.Plugin, Peasy.PluginConfigure):
                     #  data=nn)
                 #  self.word_completions = None
             return
-        line = sci.get_current_line()+1
-        word_at_pos = sci.get_line(line-1)
-        if word_at_pos.startswith(('from', 'import')):
+        col = sci.get_col_from_position(pos);
+        if col == 1 and char in ('f', 'i'):
+            return
+        line = sci.get_current_line()
+        word_at_pos = sci.get_line(line)
+        if not word_at_pos:
+            return
+        if word_at_pos.lstrip().startswith(('fr', 'im')):
             line = 1
-            buffer = sci.get_line(line-1)
+            buffer = word_at_pos.rstrip()
             import_check = True
         else:
-            buffer = sci.get_contents_range(0, pos)
+            buffer = sci.get_contents_range(0, pos).rstrip()
             import_check = False
         word_at_pos = editor.get_word_at_pos(pos, GEANY_WORDCHARS+".")
         if not word_at_pos:
             return
-        col = sci.get_col_from_position(pos);
         rootlen = len(word_at_pos)
         if '.' in word_at_pos:
             word_at_pos = editor.get_word_at_pos(pos, GEANY_WORDCHARS)
@@ -128,28 +132,34 @@ class JediPlugin(Peasy.Plugin, Peasy.PluginConfigure):
             return
         import jedi
         jedi.settings.case_insensitive_completion = False
-        script = jedi.Script(buffer, line, col, sys_path=self.sys_path)
+        try:
+            script = jedi.Script(buffer, line, col, sys_path=self.sys_path)
+        except ValueError:
+            with open('/home/sagar/{}_{}.py'.format(col, line), 'w') as f:
+                f.write(buffer)
+            return
+            #  script = jedi.Script(buffer, line, col-1, sys_path=self.sys_path)
         if not script:
             return
-        completions = script.completions()
-        if not completions:
-            return
+        data = ""
         count = 0
-        self.completion_words = {}
-        for complete in completions:
+        for complete in script.completions():
             name = complete.name
-            if name.startswith('__'):
+            if name.startswith('__') and name.endswith('__'):
                 continue
-            self.completion_words[name] = complete
-            count += 1
+            if count > 0:
+                data += "\n"
+            data += name
+            #  self.completion_words[name] = complete
+            count += 1                
             if count == 19:
                 break
         if count > 0:
-            k = self.completion_words.keys()
-            if count == 1:
-                data = "".join(k)
-            else:
-                data = "\n".join(k)
+            #  k = self.completion_words.keys()
+            #  if count == 1:
+                #  data = "".join(data)
+            #  else:
+                #  data = "\n".join(data)
             self.scintilla_command(sci,
                 sci_cmd=GeanyScintilla.SCI_AUTOCCANCEL,
                 sci_msg=GeanyScintilla.SCI_AUTOCSHOW,
