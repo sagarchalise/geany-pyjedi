@@ -86,20 +86,22 @@ class JediPlugin(Peasy.Plugin, Peasy.PluginConfigure):
         pos = sci.get_current_position()
         char = chr(char)
         if char in ('\r', '\n', '>', '/', '(', ')', '{', '[', '"', '\'', '}', ':'):
-            if char == '(':
-                word_at_pos = editor.get_word_at_pos(pos-1, GEANY_WORDCHARS)
-                if not word_at_pos or not self.completion_words:
-                    return
-                comp = self.completion_words.get(word_at_pos)
-                if not comp:
-                    return
-                if comp.name_with_symbols == word_at_pos:
-                    return
-                self.scintilla_command(sci,
-                    sci_cmd=GeanyScintilla.SCI_CALLTIPCANCEL,
-                    sci_msg=GeanyScintilla.SCI_CALLTIPSHOW,
-                    lparam=pos,
-                    data=comp.name_with_symbols)
+            #  if char == '(':
+                #  word_at_pos = editor.get_word_at_pos(pos-1, GEANY_WORDCHARS)
+                #  if not word_at_pos or not self.completion_words:
+                    #  return
+                #  comp = self.completion_words.get(word_at_pos)
+                #  if not comp:
+                    #  return
+                #  nn = comp.name_with_symbols
+                #  if nn == word_at_pos:
+                    #  return
+                #  print(nn)
+                #  self.scintilla_command(sci,
+                    #  sci_cmd=GeanyScintilla.SCI_CALLTIPCANCEL,
+                    #  sci_msg=GeanyScintilla.SCI_CALLTIPSHOW,
+                    #  lparam=pos,
+                    #  data=nn)
                 #  self.word_completions = None
             return
         line = sci.get_current_line()+1
