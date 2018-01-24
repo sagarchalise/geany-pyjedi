@@ -133,10 +133,10 @@ class JediPlugin(Peasy.Plugin, Peasy.PluginConfigure):
         import jedi
         jedi.settings.case_insensitive_completion = False
         try:
-            script = jedi.Script(buffer, line, col, sys_path=self.sys_path)
+            script = jedi.Script(buffer, line=line, column=None, path=editor.document.file_name, sys_path=self.sys_path)
         except ValueError:
-            with open('/home/sagar/{}_{}.py'.format(col, line), 'w') as f:
-                f.write(buffer)
+            #  with open('/home/sagar/{}_{}.py'.format(col, line), 'w') as f:
+                #  f.write(buffer)
             return
             #  script = jedi.Script(buffer, line, col-1, sys_path=self.sys_path)
         if not script:
