@@ -82,8 +82,6 @@ class JediPlugin(Peasy.Plugin, Peasy.PluginConfigure):
             self.complete_python(editor, nt.ch, getattr(nt, 'text', None))
 
     def complete_python(self, editor, char, text=None):
-        sci = editor.sci
-        pos = sci.get_current_position()
         char = chr(char)
         if char in ('\r', '\n', '>', '/', '(', ')', '{', '[', '"', '\'', '}', ':'):
             #  if char == '(':
@@ -104,6 +102,8 @@ class JediPlugin(Peasy.Plugin, Peasy.PluginConfigure):
                     #  data=nn)
                 #  self.word_completions = None
             return
+        sci = editor.sci
+        pos = sci.get_current_position()
         col = sci.get_col_from_position(pos);
         if col == 1 and char in ('f', 'i'):
             return
@@ -112,7 +112,6 @@ class JediPlugin(Peasy.Plugin, Peasy.PluginConfigure):
         if not word_at_pos:
             return
         if word_at_pos.lstrip().startswith(('fr', 'im')):
-            line = 1
             buffer = word_at_pos.rstrip()
             import_check = True
         else:
@@ -133,7 +132,7 @@ class JediPlugin(Peasy.Plugin, Peasy.PluginConfigure):
         import jedi
         jedi.settings.case_insensitive_completion = False
         try:
-            script = jedi.Script(buffer, line=line, column=None, path=editor.document.file_name, sys_path=self.sys_path)
+            script = jedi.Script(buffer, line=None, column=None, path=editor.document.file_name, sys_path=self.sys_path)
         except ValueError:
             #  with open('/home/sagar/{}_{}.py'.format(col, line), 'w') as f:
                 #  f.write(buffer)
