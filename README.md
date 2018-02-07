@@ -1,3 +1,6 @@
+NOTE: Use [peasy](../../tree/peasy) branch.
+
+
 # geany-pyjedi
 
 Python completion with jedi.
