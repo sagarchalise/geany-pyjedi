@@ -142,7 +142,7 @@ try:
         "A modified version of Jedi Importer to work with GObject Introspection modules"
         def follow(self):
             module_list = super().follow()
-            import_path = '.'.join([i if isinstance(i, str) else i.value for i in self.import_path])
+            import_path = '.'.join((i if isinstance(i, str) else i.value for i in self.import_path))
             if import_path.startswith('gi.repository'):
                 try:
                     module = gi_importer.load_module(import_path)
