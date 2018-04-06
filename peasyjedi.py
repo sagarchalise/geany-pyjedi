@@ -393,8 +393,7 @@ class JediPlugin(Peasy.Plugin, Peasy.PluginConfigure):
             return False
         if not Geany.highlighting_is_code_style(sci.get_lexer(), sci.get_style_at(pos-2)):
             return False
-        if nt.nmhdr.code == GeanyScintilla.SCN_CHARADDED: 
-        #  (GeanyScintilla.SCN_CHARADDED, GeanyScintilla.SCN_AUTOCSELECTION):
+        if nt.nmhdr.code in (GeanyScintilla.SCN_CHARADDED, GeanyScintilla.SCN_AUTOCSELECTION):
             self.complete_python(editor, nt.ch, getattr(nt, 'text', None))
 
     def complete_python(self, editor, char, text=None):
@@ -428,56 +427,14 @@ class JediPlugin(Peasy.Plugin, Peasy.PluginConfigure):
                 rootlen = len(word_at_pos)
         elif not rootlen or (rootlen < 2 and not import_check):
             return
-        #db = DocumentationDB()
 
-        #  def get_gi_obj(info):
-            #  """ Get a GObject Introspection object from a jedi Completion, or None if the completion is not GObject Introspection related """
-            #  if (type(info._module) == PatchedJediCompiledObject and
-               #  info._module.obj.__class__ == IntrospectionModule):
-                #  return next(info._name.infer()).obj
-            #  else:
-                #  return None
-
-        #  for info in script.completions():
-
-            # we have to use custom names here because .type and .params can't
-            # be overridden (they are properties)
-            #  obj = get_gi_obj(info)
-            #  if type(obj) == FunctionInfo:
-                    #  info.real_type = 'function'
-                    #  params = [arg_info.get_name() for arg_info in obj.get_arguments()]
-            #  else:
-                #  info.real_type = info.type
-                #  if hasattr(info, 'params'):
-                    #  if len(info.params) > 0 and \
-                       #  info.params[0].name == 'self':
-                        #  del info.params[0]
-                    #  for param in info.params:
-                        #  if hasattr(param, 'description'):
-                            #  params.append(param.description.replace('\n', ''))
-                        #  else:
-                            #  params.append(param.name)
-
-            #  doc = info.docstring()
-            #  if obj is not None:
-                # get documentation for this GObject Introspection object
-                #  symbol = None
-                #  namespace = None
-
-                #  if type(obj) == GObjectMeta or type(obj) == StructMeta:
-                    #  if hasattr(obj, '__info__'):
-                        #  symbol = obj.__info__.get_type_name()
-                        #  namespace = obj.__info__.get_namespace()
-                #  elif type(obj) == FunctionInfo:
-                    #  symbol = obj.get_symbol()
-                    #  namespace = obj.get_namespace()
-
-                #  if symbol is not None:
-                    #  result = db.query(symbol, info._module.obj._version)
-                    #  if result is not None:
-                        #  doc = result
-
-        #  db.close()
+        def get_gi_obj(info):
+            """ Get a GObject Introspection object from a jedi Completion, or None if the completion is not GObject Introspection related """
+            if (type(info._module) == PatchedJediCompiledObject and
+               info._module.obj.__class__ == IntrospectionModule):
+                return next(info._name.infer()).obj
+            else:
+                return None
         fp = editor.document.real_path or editor.document.file_name
         try:
             script = jedi.Script(buffer, line=None, column=None, path=fp, sys_path=self.sys_path)
@@ -487,16 +444,47 @@ class JediPlugin(Peasy.Plugin, Peasy.PluginConfigure):
         if not script:
             return
         data = ""
+        doc = None
+        db = DocumentationDB()
         for count, complete in enumerate(script.completions()):
             name = complete.name
             if name.startswith('__') and name.endswith('__'):
                 continue
+            print(text)
+            if hasattr(Geany, 'msgwin_msg_add_string') and text is not None:
+                if text != name:
+                    continue
+                #  # we have to use custom names here because .type and .params can't
+                #  # be overridden (they are properties)
+                doc = complete.docstring()
+                obj = get_gi_obj(complete)
+
+                if obj is not None:
+                    # get documentation for this GObject Introspection object
+                    symbol = None
+
+                    if type(obj) == GObjectMeta or type(obj) == StructMeta:
+                        if hasattr(obj, '__info__'):
+                            symbol = obj.__info__.get_type_name()
+                    elif type(obj) == FunctionInfo:
+                        symbol = obj.get_symbol()
+
+                    if symbol is not None:
+                        result = db.query(symbol, complete._module.obj._version)
+                        if result is not None:
+                            doc = result
+                break
             if count > 0:
                 data += "\n"
             data += name
             if count == 49:
                 break
-        if data:
+        db.close()
+        Geany.msgwin_clear_tab(Geany.MessageWindowTabNum.MESSAGE)
+        if doc:
+            Geany.msgwin_msg_add_string(Geany.MsgColors.BLACK, line-1, editor.document, "Doc:\n"+doc)
+            Geany.msgwin_switch_tab(Geany.MessageWindowTabNum.MESSAGE, False);
+        elif data:
             self.scintilla_command(sci,
                 sci_cmd=GeanyScintilla.SCI_AUTOCCANCEL,
                 sci_msg=GeanyScintilla.SCI_AUTOCSHOW,
