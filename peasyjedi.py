@@ -402,7 +402,7 @@ class JediPlugin(Peasy.Plugin, Peasy.PluginConfigure):
             return
         sci = editor.sci
         pos = sci.get_current_position()
-        col = sci.get_col_from_position(pos);
+        col = sci.get_col_from_position(pos)
         if col == 1 and char in ('f', 'i'):
             return
         line = sci.get_current_line()
@@ -450,7 +450,6 @@ class JediPlugin(Peasy.Plugin, Peasy.PluginConfigure):
             name = complete.name
             if name.startswith('__') and name.endswith('__'):
                 continue
-            print(text)
             if hasattr(Geany, 'msgwin_msg_add_string') and text is not None:
                 if text != name:
                     continue
