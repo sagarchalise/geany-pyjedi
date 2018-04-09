@@ -475,7 +475,14 @@ class JediPlugin(Peasy.Plugin, Peasy.PluginConfigure):
                 break
             if count > 0:
                 data += "\n"
-            data += "{}{}".format(name, "?2" if complete.name_with_symbols else "?1")
+            data += name
+            try:
+                complete.params
+            except AttributeError:
+                data += "?2"
+            else:
+                data += "?1"
+            #  data += name+("?2" if complete.name_with_symbols else "?1")
             if count == 49:
                 break
         db.close()
