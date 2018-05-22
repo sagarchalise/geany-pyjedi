@@ -1,7 +1,6 @@
 import os
 import sys
 import ctypes
-""" Taken from gnome-builder jedi plugin for gi related imports."""
 from gi.repository import Gtk
 from gi.repository import GLib
 from gi.repository import Geany
