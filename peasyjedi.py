@@ -139,8 +139,8 @@ class JediPlugin(Peasy.Plugin, Peasy.PluginConfigure):
                 rootlen = len(word_at_pos)
         elif not rootlen or (rootlen < 2 and not import_check):
             return
-
-        fp = editor.document.real_path or editor.document.file_name
+        cur_doc = editor.document
+        fp = cur_doc.real_path or cur_doc.file_name
         faked_gir_path = os.path.join(
             os.path.expanduser("~"), ".cache/fakegir"
         )
@@ -160,14 +160,19 @@ class JediPlugin(Peasy.Plugin, Peasy.PluginConfigure):
             return
         data = ""
         doc = None
+        can_doc = hasattr(Geany, "msgwin_msg_add_string") and text is not None
         for count, complete in enumerate(script.completions()):
             name = complete.name
             if name.startswith("__") and name.endswith("__"):
                 continue
-            if hasattr(Geany, "msgwin_msg_add_string") and text is not None:
+            if can_doc:
                 if text != name:
                     continue
-                doc = complete.docstring()
+                can_doc = not (
+                    complete.is_keyword or complete.type == "module"
+                )
+                if can_doc:
+                    doc = complete.docstring()
                 break
             if count > 0:
                 data += "\n"
@@ -180,15 +185,19 @@ class JediPlugin(Peasy.Plugin, Peasy.PluginConfigure):
                 data += "?1"
             if count == 49:
                 break
-        Geany.msgwin_clear_tab(Geany.MessageWindowTabNum.MESSAGE)
+        Geany.msgwin_clear_tab(Geany.MessageWindowTabNum.COMPILER)
         if doc:
-            Geany.msgwin_msg_add_string(
-                Geany.MsgColors.BLACK,
-                line - 1,
-                editor.document,
-                "Doc:\n" + doc,
+            Geany.msgwin_compiler_add_string(
+                Geany.MsgColors.BLACK, "Doc:\n" + doc
             )
-            Geany.msgwin_switch_tab(Geany.MessageWindowTabNum.MESSAGE, False)
+            #  line -= 1
+            #  Geany.msgwin_msg_add_string(
+            #      Geany.MsgColors.BLACK,
+            #      line,
+            #      cur_doc,
+            #      "Doc:\n" + doc,
+            #  )
+            Geany.msgwin_switch_tab(Geany.MessageWindowTabNum.COMPILER, False)
         elif data:
             self.scintilla_command(
                 sci,
