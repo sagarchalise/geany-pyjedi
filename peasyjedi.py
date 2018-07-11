@@ -1,6 +1,8 @@
 import os
 import sys
+import glob
 import ctypes
+
 from gi.repository import Gtk
 from gi.repository import GLib
 from gi.repository import Geany
@@ -16,11 +18,17 @@ else:
     jedi.settings.case_insensitive_completion = False
     HAS_JEDI = True
 
+try:
+    import pipenv
+except ImportError:
+    print("No pipenv")
+    pipenv = None
+
 _ = Peasy.gettext
 
-GEANY_WORDCHARS = (
-    "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-)
+GEANY_WORDCHARS = "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+USER_HOME = os.path.expanduser("~")
 
 
 class JediPlugin(Peasy.Plugin, Peasy.PluginConfigure):
@@ -44,9 +52,7 @@ class JediPlugin(Peasy.Plugin, Peasy.PluginConfigure):
         # load startup config
         self.keyfile = GLib.KeyFile.new()
         if os.path.isfile(self.jedi_config):
-            self.keyfile.load_from_file(
-                self.jedi_config, GLib.KeyFileFlags.KEEP_COMMENTS
-            )
+            self.keyfile.load_from_file(self.jedi_config, GLib.KeyFileFlags.KEEP_COMMENTS)
             self.default_include = self.keyfile.get_string("pyjedi", "path")
             self.append_sys_path(self.default_include)
         return True
@@ -72,6 +78,27 @@ class JediPlugin(Peasy.Plugin, Peasy.PluginConfigure):
         proj = self.geany_plugin.geany_data.app.project
         if proj:
             self.append_sys_path(proj.base_path)
+            # check pipenv and auto append path
+            if not pipenv:
+                return False
+
+            venv_pth = os.path.join(USER_HOME, ".virtualenvs")
+            if not os.path.isdir(venv_pth):
+                return False
+            proj_name = os.path.basename(proj.base_path)
+            for pth in os.listdir(venv_pth):
+                entry = os.path.join(venv_pth, pth)
+                if pth.startswith(proj_name) and os.path.isdir(entry):
+                    st_pk = glob.glob(os.path.join(entry, "lib/pytho*/site-packages"))
+                    st_pk = st_pk.pop() if st_pk else None
+                    if not (st_pk and os.path.isdir(st_pk)):
+                        return False
+                    proj_name = st_pk
+                    break
+            else:  # nobreak
+                return False
+            self.append_sys_path(proj_name)
+        return False
 
     def on_editor_notify(self, g_obj, editor, nt):
         cur_doc = editor.document or Geany.Document.get_current()
@@ -85,32 +112,25 @@ class JediPlugin(Peasy.Plugin, Peasy.PluginConfigure):
         pos = sci.get_current_position()
         if pos < 2:
             return False
-        if not Geany.highlighting_is_code_style(
-            sci.get_lexer(), sci.get_style_at(pos - 2)
-        ):
+        if not Geany.highlighting_is_code_style(sci.get_lexer(), sci.get_style_at(pos - 2)):
             return False
-        if nt.nmhdr.code in (
-            GeanyScintilla.SCN_CHARADDED,
-            GeanyScintilla.SCN_AUTOCSELECTION,
-        ):
+        if nt.nmhdr.code in (GeanyScintilla.SCN_CHARADDED, GeanyScintilla.SCN_AUTOCSELECTION):
             self.complete_python(editor, nt.ch, getattr(nt, "text", None))
+        return False
+
+    @staticmethod
+    def get_path_for_completion(sys_path):
+        faked_gir_path = os.path.join(USER_HOME, ".cache/fakegir")
+        if os.path.isdir(faked_gir_path):
+            path = [faked_gir_path] + sys_path
+        else:
+            print("Support for GIR may be missing")
+            path = sys_path
+        return path
 
     def complete_python(self, editor, char, text=None):
         char = chr(char)
-        if char in (
-            "\r",
-            "\n",
-            ">",
-            "/",
-            "(",
-            ")",
-            "{",
-            "[",
-            '"',
-            "'",
-            "}",
-            ":",
-        ):
+        if char in ("\r", "\n", ">", "/", "(", ")", "{", "[", '"', "'", "}", ":"):
             return
         sci = editor.sci
         pos = sci.get_current_position()
@@ -141,18 +161,9 @@ class JediPlugin(Peasy.Plugin, Peasy.PluginConfigure):
             return
         cur_doc = editor.document
         fp = cur_doc.real_path or cur_doc.file_name
-        faked_gir_path = os.path.join(
-            os.path.expanduser("~"), ".cache/fakegir"
-        )
-        if os.path.isdir(faked_gir_path):
-            path = [faked_gir_path] + self.sys_path
-        else:
-            print("Support for GIR may be missing")
-            path = self.sys_path
+        path = self.get_path_for_completion(self.sys_path)
         try:
-            script = jedi.Script(
-                buffer, line=None, column=None, path=fp, sys_path=path
-            )
+            script = jedi.Script(buffer, line=None, column=None, path=fp, sys_path=path)
         except ValueError as e:
             print(e)
             return
@@ -168,9 +179,7 @@ class JediPlugin(Peasy.Plugin, Peasy.PluginConfigure):
             if can_doc:
                 if text != name:
                     continue
-                can_doc = not (
-                    complete.is_keyword or complete.type == "module"
-                )
+                can_doc = not (complete.is_keyword or complete.type == "module")
                 if can_doc:
                     doc = complete.docstring()
                 break
@@ -187,9 +196,7 @@ class JediPlugin(Peasy.Plugin, Peasy.PluginConfigure):
                 break
         Geany.msgwin_clear_tab(Geany.MessageWindowTabNum.COMPILER)
         if doc:
-            Geany.msgwin_compiler_add_string(
-                Geany.MsgColors.BLACK, "Doc:\n" + doc
-            )
+            Geany.msgwin_compiler_add_string(Geany.MsgColors.BLACK, "Doc:\n" + doc)
             #  line -= 1
             #  Geany.msgwin_msg_add_string(
             #      Geany.MsgColors.BLACK,
@@ -210,15 +217,10 @@ class JediPlugin(Peasy.Plugin, Peasy.PluginConfigure):
     def on_configure_response(self, dlg, response_id, user_data):
         if response_id in (Gtk.ResponseType.APPLY, Gtk.ResponseType.OK):
             inc = user_data.get_text()
-            if (
-                self.default_include is not None
-                and inc == self.default_include
-            ):
+            if self.default_include is not None and inc == self.default_include:
                 return
             if os.path.isfile(self.jedi_config):
-                self.keyfile.load_from_file(
-                    self.jedi_config, GLib.KeyFileFlags.KEEP_COMMENTS
-                )
+                self.keyfile.load_from_file(self.jedi_config, GLib.KeyFileFlags.KEEP_COMMENTS)
                 self.keyfile.set_string("pyjedi", "path", inc or "")
                 self.keyfile.save_to_file(self.jedi_config)
             if self.default_include in self.sys_path:
