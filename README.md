@@ -1,4 +1,4 @@
-NOTE: Use [peasy](../../tree/peasy) branch.
+NOTE: See [Pycoding for geany](../../../geany-pycoding/) Repo.
 
 
 # geany-pyjedi
